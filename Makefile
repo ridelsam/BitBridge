@@ -30,7 +30,9 @@ C_SOURCES := \
     Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal.c \
     Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_cortex.c \
     Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_gpio.c \
-    Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c
+    Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_rcc.c \
+    Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart.c \
+    Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_uart_ex.c
 
 ASM_SOURCE := Core/Startup/startup_stm32f767zitx.s
 

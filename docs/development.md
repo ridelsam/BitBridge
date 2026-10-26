@@ -10,11 +10,12 @@
 | Debugger | Bundled Linux Arm GDB; executable checked |
 | Build utility | GNU Make 4.4.1 |
 | Debug server | OpenOCD 0.12.0; ST-LINK and STM32F7 configuration files present |
-| USB forwarding | Windows usbipd; ST-LINK attachment to WSL confirmed; MCU debug access pending |
+| USB forwarding | Windows usbipd; ST-LINK attachment and MCU debug access through WSL verified |
 
-Compiler tools are installed outside the repository and are not currently on
-the inspected shell's PATH. Record explicit selection in the eventual build setup.
-Vendor firmware package version and provenance have not yet been established.
+Compiler tools are installed outside the repository and selected explicitly by
+the Makefile. Initial generation used STM32CubeIDE 1.9.0, integrated CubeMX
+6.5.0 (database DB.6.0.50), and STM32CubeF7 v1.16.2. These versions were recorded
+from the IDE and original configuration before removing the `.ioc`.
 
 ## Implementation approach
 
@@ -39,12 +40,21 @@ have not been verified in this project.
 
 ## Windows and WSL boundary
 
-The intended workflow uses Windows CubeIDE to generate vendor foundations and
-WSL tools to build, flash, and debug the canonical source. Generation/export
-procedure and source placement must be agreed before project creation.
+Windows CubeIDE generated the vendor foundations in a separate staging folder.
+The inspected `Core/`, `Drivers/`, and Flash linker script were copied
+into this repository. WSL tools build, flash, and debug the canonical source.
+Make source edits here; later CubeIDE regeneration requires explicit review
+and import rather than assuming both copies remain synchronized.
 
-The Ethernet dongle is intended to remain owned by Windows. Placement of the
-host application and serial terminal will be confirmed during bring-up.
+The `Core` sources and headers are maintained manually, with generator
+`USER CODE` markers and empty template sections removed. The `.ioc` has been
+removed from this repository; the original remains in Git history. Source code
+is authoritative for clock, pin, and peripheral configuration. Preserve vendor
+notices and review any later generated changes before incorporating them.
+
+The Ethernet dongle and initial network client are intended to remain owned by
+Windows. Use a WSL serial terminal so ST-LINK can remain attached to WSL for
+programming, debugging, and VCP access.
 Attaching the composite ST-LINK device to WSL transfers its VCP along with the
 debug interface; do not assume a Windows terminal can use it simultaneously.
 
@@ -70,6 +80,39 @@ lsusb
 An ST-LINK entry establishes USB enumeration, not target debug communication.
 Reference: [Microsoft USB access in WSL](https://learn.microsoft.com/en-us/windows/wsl/connect-usb).
 
+## Serial terminal setup
+
+SB4/SB5/SB6/SB7 are visually confirmed fitted. SB5/SB6 provide the ST-LINK
+UART path; SB4/SB7 also connect the pins to the expansion headers. Leave the
+header pins unconnected during this test. Startup transmission and one-byte
+polling receive/echo are exercised through the terminal at interactive rates.
+
+WSL enumerates the VCP as `/dev/ttyACM0` with a link under `/dev/serial/by-id/`.
+The numbered device may change after reconnecting; use the by-ID link to identify
+the correct port. Its observed permissions are `0660`, owned by `root:plugdev`.
+
+pySerial miniterm is available in the inspected Python environment. Exercised
+UART settings are 115200 baud, eight data bits, no parity, one stop bit,
+with hardware/software flow control and local echo disabled:
+
+```bash
+python3 -m serial.tools.miniterm --parity N /dev/ttyACM0 115200
+```
+
+Exit with Ctrl+]. Opening the terminal at these settings is verified. Report an
+access error before changing permissions or installing tools. Open the terminal
+before programming, or press B2 after opening it, to observe the one-shot startup
+transmission. The terminal displays `U` followed by a new line; LD1 lights after
+the HAL transmit call reports success. This is not a raw-byte capture. The saved
+count is `sizeof(data) - 1U`, excluding the string initializer's NUL terminator
+from the intended three-byte payload.
+
+For the receive test, type individual ASCII characters with local echo off;
+the firmware receives one byte and transmits that byte back. The terminal's
+displayed characters establish the exercised round trip. Test again after an
+idle pause; ordinary 100 ms receive timeouts retry rather than halt the loop.
+This test is not a raw-byte comparison or a burst/overrun characterization.
+
 ## Build
 
 From the repository root in WSL:
@@ -83,21 +126,47 @@ The Makefile selects Arm GNU Toolchain 14.2.Rel1 from
 with `make TOOLCHAIN_DIR=/path/to/toolchain`. This selects a location; it does
 not automatically validate the installed toolchain's version.
 
-The current target compiles eight C files and one startup assembly file for
+The current target compiles ten C files and one startup assembly file for
 Cortex-M7, FPv5-D16, hard-float ABI, using `-Og -g3`. It links against the
 installed Newlib-nano runtime and no-OS syscall stubs with
 `STM32F767ZITX_FLASH.ld`. Outputs are `build/BitBridge.elf` and
 `build/BitBridge.map`; no separate binary image is needed to program the ELF.
 
-The `.ioc` records STM32CubeF7 v1.16.2. It is not an input to compilation;
-configuration changes require deliberately regenerating/importing code or
-maintaining that code manually. Builds do not enable a debug print channel.
+Configuration changes are maintained manually in the source. CubeMX is not
+required to build, flash, or debug this repository. Builds do not enable a
+debug print channel.
 
 Compilation, linking, programming, image verification, and the breakpoint at
 `main()` have been exercised. Stepping through initialization reaches the main
-loop; observable LED behavior is the next check. See [project status](project-status.md).
+loop. The LD1 output-high change is hardware-verified after standalone
+programming and B2 reset. See [project status](project-status.md).
 
-## Flash and debug
+## Flash without GDB
+
+This standalone command and the interactive programming/verification sequence
+below have been exercised on the board.
+
+First end any GDB session (`disconnect`, then `quit`) and stop its OpenOCD server
+with Ctrl+C in the server terminal. Only one process may own the probe.
+
+With ST-LINK attached to WSL, run from the repository root:
+
+```bash
+make && openocd -f openocd.cfg -c "program build/BitBridge.elf verify reset exit"
+```
+
+`&&` starts programming only if the build succeeds. OpenOCD initializes the
+target, erases/programs the necessary Flash sectors, verifies the image, resets
+the MCU to run the firmware, and exits. GDB and breakpoints are not involved;
+the programmer still uses the SWD hardware connection.
+
+Expect programming and verification success, followed by reset and shutdown.
+Stop and inspect any error. For the current LD1 change, verify that the green
+user LED turns on and remains on; repeat with B2 reset to check startup again.
+
+Reference: [OpenOCD flash programming](https://openocd.org/doc-release/html/Flash-Programming.html).
+
+## Interactive debug
 
 Target connection, image verification, and the breakpoint at `main()` have been
 exercised using this sequence.
@@ -142,7 +211,7 @@ the matching ELF into both GDB and the target before interpreting source lines.
 
 ## Baseline acceptance procedure
 
-Not yet executed in this project:
+Acceptance criteria; see project status for completed checks and remaining work:
 
 1. Identify board revision and verify relevant clock/debug connections against
    the matching ST documentation.

@@ -10,11 +10,16 @@ Minimal bare-metal firmware with a Make-based WSL build using Arm GNU Toolchain
 
 Hardware verification covers programming and image readback verification through
 onboard ST-LINK, a GDB breakpoint at `main()`, and stepping through HAL, clock,
-and GPIO initialization to the main loop. An observable LED change remains to
-be verified. Clock frequencies have not been measured.
+and GPIO initialization to the main loop. Standalone programming and verification
+are exercised; green LD1 lights after startup and remains lit after B2 reset.
+Clock frequencies have not been measured.
 
-UART, Ethernet, CAN, native USB, and traffic forwarding are not implemented.
-No host application is implemented.
+UART initialization and a startup transmit test are exercised on hardware: the
+terminal displays `U` and a new line after startup and B2 reset, with HAL reporting
+success. A one-byte polling receive/echo test is exercised through the terminal
+with local echo disabled. These checks cover interactive low-rate traffic;
+burst handling and raw-byte integrity have not been established. Ethernet, CAN,
+native USB, traffic forwarding, and the host application are not implemented.
 
 ## Hardware
 
@@ -36,12 +41,15 @@ Outputs are `build/BitBridge.elf` and `build/BitBridge.map`. The default toolcha
 location and the build, flash, and debug procedures are documented in
 [development procedures](docs/development.md). The
 [project status](docs/project-status.md) records verified state and the next action.
+Use the [standalone flash procedure](docs/development.md#flash-without-gdb)
+to program and run the firmware without an interactive debugger.
 
 ## Roadmap
 
-1. Minimal firmware: reproducible build, verified programming, breakpoint at
+1. Completed: minimal firmware with a reproducible build, verified programming, breakpoint at
    `main()`, and an observable onboard LED change.
-2. Independent UART transmit/receive verification through ST-LINK VCP.
+2. Completed initial UART transmit/receive verification through ST-LINK VCP
+   at interactive rates; throughput and loss characterization remain future work.
 3. Independent Ethernet connectivity and a minimal host application.
 4. Known-byte forwarding from UART to the host, then the reverse direction.
 5. Incremental diagnostics and Classical CAN forwarding as requirements justify them.
