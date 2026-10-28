@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "STM32F767ZI (WSL)",
+            "compilerPath": "${env:HOME}/tools/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-mcpu=cortex-m7",
+                "-mthumb",
+                "-mfpu=fpv5-d16",
+                "-mfloat-abi=hard",
+                "--specs=nano.specs"
+            ],
+            "intelliSenseMode": "linux-gcc-arm",
+            "cStandard": "gnu11",
+            "defines": [
+                "STM32F767xx",
+                "USE_HAL_DRIVER"
+            ],
+            "includePath": [
+                "${workspaceFolder}/Core/Inc",
+                "${workspaceFolder}/Drivers/STM32F7xx_HAL_Driver/Inc",
+                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F7xx/Include",
+                "${workspaceFolder}/Drivers/CMSIS/Include"
+            ]
+        }
+    ],
+    "version": 4
+}

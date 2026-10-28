@@ -141,6 +141,23 @@ Compilation, linking, programming, image verification, and the breakpoint at
 loop. The LD1 output-high change is hardware-verified after standalone
 programming and B2 reset. See [project status](project-status.md).
 
+## VS Code code navigation
+
+Open the repository as a folder in a WSL-connected VS Code window, with the
+Microsoft C/C++ extension enabled in WSL. The checked-in
+[IntelliSense configuration](../.vscode/c_cpp_properties.json) mirrors the
+Makefile's compiler, target flags, C standard, defines and include directories.
+Keep it synchronized when these build inputs change; if the toolchain is moved,
+update `compilerPath` as well.
+
+With a C source file open, select `STM32F767ZI (WSL)` through
+`C/C++: Select a Configuration` in the Command Palette. Test F12 on
+`HAL_UART_Init` in `Core/Src/main.c`; it should navigate to the HAL source.
+Use the context menu's Go to Declaration to visit its header declaration.
+If navigation remains stale, run `C/C++: Reset IntelliSense Database`, then
+`Developer: Reload Window`. `C/C++: Log Diagnostics` shows the compiler,
+include paths and defines actually selected by the extension.
+
 ## Flash without GDB
 
 This standalone command and the interactive programming/verification sequence

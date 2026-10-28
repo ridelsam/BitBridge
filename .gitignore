@@ -1,1 +1,22 @@
+# Firmware build outputs
 /build/
+*.o
+*.d
+*.elf
+*.map
+*.su
+
+# VS Code C/C++ caches; keep project configuration trackable
+/.vscode/ipch/
+/.vscode/*.db
+/.vscode/*.db-shm
+/.vscode/*.db-wal
+
+# Editor temporary files
+*~
+*.swp
+*.swo
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db

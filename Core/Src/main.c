@@ -20,10 +20,16 @@
 /* Private variables ---------------------------------------------------------*/
 static UART_HandleTypeDef huart3 = {0};
 
+static uint8_t MAC_Addr[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+static ETH_HandleTypeDef heth = {0};
+static uint32_t phy_id1 = 0;
+static uint32_t phy_id2 = 0;
+
 /* Function prototypes -------------------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_ETH_Init(void);
 
 /**
   * @brief  The application entry point.
@@ -47,6 +53,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_ETH_Init();
   
   if (HAL_UART_Transmit(&huart3, data_tx, sizeof(data_tx) - 1U, 100U) != HAL_OK)
   {
@@ -97,7 +104,13 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState  = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM      = 16;
+  RCC_OscInitStruct.PLL.PLLN      = 128;
+  RCC_OscInitStruct.PLL.PLLP      = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4U;
+  RCC_OscInitStruct.PLL.PLLR = 2U;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -107,12 +120,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct,  FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -160,6 +173,34 @@ static void MX_USART3_UART_Init(void)
   {
     Error_Handler();
   }
+}
+
+static void MX_ETH_Init(void)
+{
+  heth.Instance = ETH;
+  heth.Init.MACAddr = MAC_Addr;
+  heth.Init.AutoNegotiation = ETH_AUTONEGOTIATION_ENABLE;
+  heth.Init.MediaInterface = ETH_MEDIA_INTERFACE_RMII;
+  heth.Init.RxMode = ETH_RXPOLLING_MODE;
+  heth.Init.ChecksumMode = ETH_CHECKSUM_BY_SOFTWARE;
+  heth.Init.PhyAddress = LAN8742A_PHY_ADDRESS;
+
+  if (HAL_ETH_Init(&heth) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  HAL_StatusTypeDef status_eth_phy1, status_eth_phy2;
+  status_eth_phy1 = HAL_ETH_ReadPHYRegister(&heth, 2U, &phy_id1);
+  status_eth_phy2 = HAL_ETH_ReadPHYRegister(&heth, 3U, &phy_id2);
+
+  if (status_eth_phy1 != HAL_OK || status_eth_phy2 != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  return;
+
 }
 
 /**
