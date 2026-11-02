@@ -10,7 +10,9 @@ The matching Ethernet HAL files are imported, enabled and compiled. The
 initialization helper, LAN8742A configuration and Ethernet MSP clocks/pins are
 implemented. On target, HAL initialization returns `HAL_OK` and reports a
 100 Mbps full-duplex link. PHY ID readback matches LAN8742A revision 1.
-Next is reviewing DMA descriptors, frame buffers and their memory requirements.
+Four aligned RX/TX descriptor and frame-buffer arrays are connected through
+checked HAL list initializers. Build, linked placement and the inspected RX/TX
+descriptor links/initial ownership pass; the first frame-transfer gate is next.
 The build/debug/LED baseline and initial low-rate UART tests are complete.
 
 ## Verified state
@@ -70,6 +72,22 @@ The build/debug/LED baseline and initial low-rate UART tests are complete.
 
 ## Limitations and open items
 
+- Checked RX/TX descriptor-list initialization calls are implemented after PHY
+  identification and build successfully. ELF inspection places all four arrays
+  in `.bss` within DMA-accessible DTCM (`0x20000000`–`0x2001FFFF`), with four-byte
+  alignment and no overlap: RX descriptors `0x20003058`/128 bytes, TX descriptors
+  `0x20002FD8`/128 bytes, RX buffers `0x20001808`/6096 bytes, TX buffers
+  `0x20000038`/6096 bytes. User-supplied GDB output confirms both handle pointers
+  select descriptor 0. RX descriptor 0 has status `0x80000000`, control/size
+  `0x45F4`, buffer `0x20001808`, and next descriptor `0x20003078`. Subsequent
+  complete output confirms RX descriptor 3 points to buffer `0x200029E4` and wraps
+  to descriptor 0 at `0x20003058`. TX descriptors 0/3 have status `0x00100000`
+  (chained, CPU-owned), zero buffer lengths, buffers `0x20000038`/`0x20001214`,
+  and next links `0x20002FF8`/`0x20002FD8`; the last wraps to TX descriptor 0.
+  Enhanced fields shown are zero. Frame transfer remains stopped.
+- Source inspection finds no CPU cache-enable calls. User-supplied GDB output
+  reading `SCB->CCR` bit 16 reports zero: data cache is disabled in the exercised
+  firmware. Reassess buffer visibility requirements before enabling it.
 - VS Code IntelliSense configuration now mirrors the Makefile's Arm compiler,
   target flags, defines and include paths. Compiler syntax checks using that
   configuration pass for main, MSP and Ethernet HAL sources; editor navigation
@@ -94,10 +112,12 @@ The build/debug/LED baseline and initial low-rate UART tests are complete.
 
 ## Exact next action
 
-Review `ETH_DMADescTypeDef`, the HAL TX/RX descriptor-list initialization APIs,
-and the frame-buffer requirements. Check STM32F767 DMA memory accessibility,
-alignment, linker placement and actual cache enable state before allocating
-resources or enabling frame transfer. Then continue to bare-metal lwIP integration.
+Choose and explain the first bounded frame-transfer/service gate toward lwIP,
+DHCP and ping. Review MAC/DMA start, polling reception and descriptor recycling
+before enabling the data path; do not let a test consume RX buffers without
+returning them. Initial descriptor-list setup and inspected ownership/links pass.
+Data cache is disabled; no cache maintenance is added. DTCM placement results
+from the current `.bss` layout; no dedicated placement section is enforced.
 The board PHY supplies the 50 MHz RMII reference; the vendor RTOS example's IRQ
 and MCO setup should not be imported into this polling design.
 Continue toward frame transfer, a DHCP lease, then Windows ping replies.

@@ -44,6 +44,63 @@ location and the build, flash, and debug procedures are documented in
 Use the [standalone flash procedure](docs/development.md#flash-without-gdb)
 to program and run the firmware without an interactive debugger.
 
+## GDB quick reference
+
+Run `make` after source changes. With ST-LINK attached to WSL, start one OpenOCD
+server from the repository root in terminal 1:
+
+```bash
+openocd -f openocd.cfg
+```
+
+In terminal 2, also from the repository root:
+
+```bash
+~/tools/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi/bin/arm-none-eabi-gdb build/BitBridge.elf
+```
+
+Enter the following **inside GDB, in order**. Stop if programming or verification
+fails. OpenOCD startup does not build or program the firmware.
+
+| Command | Purpose |
+|---|---|
+| `target remote localhost:3333` | Connect GDB to OpenOCD. |
+| `monitor reset halt` | Reset the MCU and keep it halted. |
+| `load` | Program the ELF loaded in GDB onto the MCU. |
+| `monitor verify_image build/BitBridge.elf` | Verify the programmed contents against the ELF. |
+| `monitor reset halt` | Reset again before debugging the new image. |
+| `tbreak main` | Set a breakpoint that removes itself when reached. |
+| `continue` | Resume execution until a breakpoint or another debugger stop. |
+
+Common commands once connected:
+
+| Command | Purpose |
+|---|---|
+| Ctrl+C | Halt a running target and return to the GDB prompt. |
+| `break Error_Handler` | Stop if the firmware enters its error handler. |
+| `tbreak MX_ETH_Init` | Stop once at Ethernet initialization. |
+| `next` (`n`) | Step one source line, running over function calls. |
+| `step` (`s`) | Step one source line, entering function calls. |
+| `finish` | Run until the current function returns; display its return value when available. |
+| `print heth.State` | Inspect a variable or expression (`p` is shorthand). |
+| `p/x rx_descriptors[0]` | Print a descriptor's fields in hexadecimal. |
+| `p &rx_buffer[0][0]` | Inspect an object's address. |
+| `x/8wx &rx_descriptors[0]` | Examine eight 32-bit words in hexadecimal. |
+| `backtrace` (`bt`) | Show the current function-call stack. |
+| `list` | Show source around the current location. |
+| `info breakpoints` | List breakpoints and their numbers. |
+| `delete 2` | Delete breakpoint number 2; substitute the number from the list. |
+| `file build/BitBridge.elf` | Reload the ELF and symbols after rebuilding; does not program the MCU. |
+| `disconnect`, then `quit` | End the GDB connection and exit; stop OpenOCD separately with Ctrl+C. |
+
+Editing and rebuilding can happen while both tools remain open. After a rebuild,
+halt the target, reload symbols with `file build/BitBridge.elf`, then repeat the
+program/verify/reset/break/run sequence above. Keep source, GDB symbols and target
+firmware matched. Prefer `finish` over stepping through time-sensitive initialization;
+pausing while SysTick is active can affect timeout behavior.
+
+See [interactive debug](docs/development.md#interactive-debug) for the full procedure.
+
 ## Roadmap
 
 1. Completed: minimal firmware with a reproducible build, verified programming, breakpoint at

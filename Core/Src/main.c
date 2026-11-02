@@ -22,6 +22,13 @@ static UART_HandleTypeDef huart3 = {0};
 
 static uint8_t MAC_Addr[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
 static ETH_HandleTypeDef heth = {0};
+
+//ethernet FRAME buffers and descriptors
+static ETH_DMADescTypeDef  rx_descriptors[ETH_RXBUFNB] __ALIGN_END = {0}; /* Ethernet Rx DMA Descriptors */
+static ETH_DMADescTypeDef  tx_descriptors[ETH_TXBUFNB] __ALIGN_END = {0}; /* Ethernet Tx DMA Descriptors */
+static uint8_t rx_buffer[ETH_RXBUFNB][ETH_RX_BUF_SIZE] __ALIGN_END = {0}; /* Ethernet Receive Buffers */
+static uint8_t tx_buffer[ETH_TXBUFNB][ETH_TX_BUF_SIZE] __ALIGN_END = {0}; /* Ethernet Transmit Buffers */
+
 static uint32_t phy_id1 = 0;
 static uint32_t phy_id2 = 0;
 
@@ -195,6 +202,15 @@ static void MX_ETH_Init(void)
   status_eth_phy2 = HAL_ETH_ReadPHYRegister(&heth, 3U, &phy_id2);
 
   if (status_eth_phy1 != HAL_OK || status_eth_phy2 != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_ETH_DMARxDescListInit(&heth, rx_descriptors, &rx_buffer[0][0], ETH_RXBUFNB) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_ETH_DMATxDescListInit(&heth, tx_descriptors, &tx_buffer[0][0], ETH_TXBUFNB) != HAL_OK)
   {
     Error_Handler();
   }
