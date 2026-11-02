@@ -18,8 +18,12 @@ UART initialization and a startup transmit test are exercised on hardware: the
 terminal displays `U` and a new line after startup and B2 reset, with HAL reporting
 success. A one-byte polling receive/echo test is exercised through the terminal
 with local echo disabled. These checks cover interactive low-rate traffic;
-burst handling and raw-byte integrity have not been established. Ethernet, CAN,
-native USB, traffic forwarding, and the host application are not implemented.
+burst handling and raw-byte integrity have not been established.
+
+Ethernet initialization, PHY identification, and polling reception of broadcast
+ARP frames are exercised, including descriptor release and buffer reuse through
+chain wraparound. Ethernet transmission, lwIP/IP connectivity, CAN, native USB,
+traffic forwarding, and the host application are not implemented.
 
 ## Hardware
 

@@ -37,6 +37,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_ETH_Init(void);
+static void Ethernet_Poll(void);
 
 /**
   * @brief  The application entry point.
@@ -73,6 +74,8 @@ int main(void)
   /* Infinite loop */
   while (1)
   {
+    Ethernet_Poll();
+
     HAL_StatusTypeDef status_rx;
     status_rx = HAL_UART_Receive(&huart3, data_rx, 1U, 100U);
     if (status_rx == HAL_OK)
@@ -215,8 +218,48 @@ static void MX_ETH_Init(void)
     Error_Handler();
   }
 
+  __DMB(); /* Ensure all memory accesses are complete before starting the DMA. */
+  if (HAL_ETH_Start(&heth) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
   return;
 
+}
+
+static void Ethernet_Poll(void)
+{
+  ETH_DMADescTypeDef *dmarxdesc;
+
+  if (HAL_ETH_GetReceivedFrame(&heth) != HAL_OK)
+  {
+    return;
+  }
+
+  __NOP(); /* Breakpoint location: inspect frame before releasing it. */
+  dmarxdesc = heth.RxFrameInfos.FSRxDesc;
+
+  /* Return this frame's descriptors to DMA. */
+  __DMB(); /* Ensure all memory accesses are complete before updating the OWN bit. */
+  for (uint32_t i = 0; i < heth.RxFrameInfos.SegCount; i++)
+  {
+    dmarxdesc->Status |= ETH_DMARXDESC_OWN;
+    dmarxdesc = (ETH_DMADescTypeDef *)(dmarxdesc->Buffer2NextDescAddr);
+  }
+  __DMB(); /* Ensure all memory accesses are complete before updating the DMA registers. */
+
+  heth.RxFrameInfos.SegCount = 0;
+
+  /*resume reception if DMA ran out of available buffers*/
+
+  if ((heth.Instance->DMASR & ETH_DMASR_RBUS) != 0U)
+  {
+    /* Clear RBUS ETHERNET DMA flag */
+    heth.Instance->DMASR = ETH_DMASR_RBUS;
+    /* Resume DMA reception */
+    heth.Instance->DMARPDR = 0U;
+  }
 }
 
 /**

@@ -12,7 +12,10 @@ implemented. On target, HAL initialization returns `HAL_OK` and reports a
 100 Mbps full-duplex link. PHY ID readback matches LAN8742A revision 1.
 Four aligned RX/TX descriptor and frame-buffer arrays are connected through
 checked HAL list initializers. Build, linked placement and the inspected RX/TX
-descriptor links/initial ownership pass; the first frame-transfer gate is next.
+descriptor links/initial ownership pass. A checked MAC/DMA start and an RX
+polling/recycling helper are implemented and integrated in the foreground loop.
+Broadcast ARP reception, descriptor release and RX chain wraparound/reuse are
+exercised on hardware. Next is planning the bare-metal lwIP interface integration.
 The build/debug/LED baseline and initial low-rate UART tests are complete.
 
 ## Verified state
@@ -72,6 +75,25 @@ The build/debug/LED baseline and initial low-rate UART tests are complete.
 
 ## Limitations and open items
 
+- `MX_ETH_Init()` now contains checked `HAL_ETH_Start()`. `Ethernet_Poll()` polls
+  for a complete frame, provides a pre-release GDB inspection point, returns
+  exactly `SegCount` descriptors from `FSRxDesc`, orders ownership handoff with
+  DMB, clears the segment count and clears/resumes RBUS through DMASR/DMARPDR.
+  The helper is called before the blocking UART receive; a DMB precedes MAC/DMA
+  start. Source review and build pass. User-supplied GDB output at the pre-release
+  inspection point establishes one received frame: one segment, length 60 excluding
+  CRC, first/last descriptor `0x20003058`, buffer `0x20001808`, status `0x00400320`
+  (CPU-owned, first/last set, error-summary clear). The first 42 captured bytes
+  decode as an Ethernet broadcast ARP request/probe: source MAC
+  `5C:85:7E:32:BF:98`, EtherType `0x0806`, sender IPv4 `0.0.0.0`, target IPv4
+  `192.168.137.1`. This is not the requested target `192.168.137.2`; likely host
+  address-conflict probing. After `finish`, GDB shows `SegCount = 0` and descriptor
+  status `0x80400320`, confirming release to DMA. Subsequent frame metadata walks
+  descriptors 1, 2, 3 and back to 0, demonstrating continued reception and buffer
+  reuse. On the reused descriptor 0, captured ARP bytes show sender IPv4
+  `192.168.137.1`, target IPv4 `192.168.137.2`, matching the host's ping-triggered
+  address-resolution request. Explicit RBUS exhaustion/recovery, sustained-rate
+  behavior and loss/error characterization remain unverified.
 - Checked RX/TX descriptor-list initialization calls are implemented after PHY
   identification and build successfully. ELF inspection places all four arrays
   in `.bss` within DMA-accessible DTCM (`0x20000000`–`0x2001FFFF`), with four-byte
@@ -84,7 +106,7 @@ The build/debug/LED baseline and initial low-rate UART tests are complete.
   to descriptor 0 at `0x20003058`. TX descriptors 0/3 have status `0x00100000`
   (chained, CPU-owned), zero buffer lengths, buffers `0x20000038`/`0x20001214`,
   and next links `0x20002FF8`/`0x20002FD8`; the last wraps to TX descriptor 0.
-  Enhanced fields shown are zero. Frame transfer remains stopped.
+  Enhanced fields shown are zero. These initial-state checks preceded MAC/DMA start.
 - Source inspection finds no CPU cache-enable calls. User-supplied GDB output
   reading `SCB->CCR` bit 16 reports zero: data cache is disabled in the exercised
   firmware. Reassess buffer visibility requirements before enabling it.
@@ -105,22 +127,25 @@ The build/debug/LED baseline and initial low-rate UART tests are complete.
 - Linker warnings remain for no-OS `_close`, `_lseek`, `_read`, and `_write` stubs
   and an RWE Flash load segment. Standard-I/O retargeting is not implemented;
   ELF permission flags do not establish hardware memory permissions.
-- Ethernet frame transfer and lwIP/IP connectivity, CAN, native USB, forwarding,
-  and the host application are unimplemented.
+- Raw Ethernet RX and descriptor reuse are exercised; TX frame transfer, lwIP/IP connectivity,
+  CAN, native USB, forwarding and the host application are unimplemented.
 - Ethernet requires a higher HCLK than the previously exercised 16 MHz configuration; see
   [RM0410](https://www.st.com/resource/en/reference_manual/rm0410-stm32f7-series.pdf).
 
 ## Exact next action
 
-Choose and explain the first bounded frame-transfer/service gate toward lwIP,
-DHCP and ping. Review MAC/DMA start, polling reception and descriptor recycling
-before enabling the data path; do not let a test consume RX buffers without
-returning them. Initial descriptor-list setup and inspected ownership/links pass.
+Review the matching lwIP 2.1.2 package's bare-metal (`NO_SYS`) interface contract
+and minimal IPv4/ARP/DHCP/ICMP build configuration. Agree on integration/module
+ownership before substantial refactoring: the current diagnostic RX path discards
+frames after inspection and must instead deliver them to lwIP before recycling.
+Add a TX adapter and recurring packet/timeout service, then verify DHCP and ping.
+Keep the 100 ms UART wait's service-latency limitation explicit; the raw RX
+diagnostic does not establish throughput or burst handling.
 Data cache is disabled; no cache maintenance is added. DTCM placement results
 from the current `.bss` layout; no dedicated placement section is enforced.
 The board PHY supplies the 50 MHz RMII reference; the vendor RTOS example's IRQ
 and MCO setup should not be imported into this polling design.
-Continue toward frame transfer, a DHCP lease, then Windows ping replies.
+Continue toward bidirectional frame transfer, a DHCP lease, then Windows ping replies.
 
 ## Later decisions
 
