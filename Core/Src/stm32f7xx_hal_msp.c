@@ -87,3 +87,6 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef *heth)
         HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
     }
 }
+
+
+

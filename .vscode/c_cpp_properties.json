@@ -18,6 +18,7 @@
             ],
             "includePath": [
                 "${workspaceFolder}/Core/Inc",
+                "${workspaceFolder}/Middlewares/Third_Party/LwIP/src/include",
                 "${workspaceFolder}/Drivers/STM32F7xx_HAL_Driver/Inc",
                 "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F7xx/Include",
                 "${workspaceFolder}/Drivers/CMSIS/Include"
